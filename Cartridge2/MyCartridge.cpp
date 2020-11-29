@@ -1,8 +1,3 @@
-/*
-  Cartridge.cpp - Library for parsing VGM into an NES APU emulation!
-  Created by Connor Nishijima, October 14th 2018.
-  Released under the GPLv3 license.
-*/
 
 #include "MyCartridge.h"
 
@@ -38,10 +33,81 @@ void Cartridge::init() {
   sigmaDeltaWrite(t_channel, 0);
 }
 
-void Cartridge::tone(double freq, long duration_ms) {
-  auto volume = 4;
+#define channel_count 4
+
+typedef struct {
+  uint8_t wave_form;
+  double freq;
+  long stop_time_ms;
+} channel_info;
+
+
+typedef struct {
+  double half_cycle_us; // for rectangle wave
+  long next_toggle_time_us;
+  uint8_t max_value; // for triangle wave
+  uint8_t value;
+} channel_register;
+
+static channel_info g_channels_info[channel_count];
+static channel_register g_channel_registers[channel_count];
+
+bool Cartridge::sample_my_audio() {
+  auto t_ms = millis();
+  auto t_us = micros();
+  bool is_playing = false;
+  for (size_t i = 0; i < channel_count; i++) {
+    channel_info* pInfo = &g_channels_info[i];
+    if (pInfo->stop_time_ms != 0) {
+      if (t_ms > pInfo->stop_time_ms) {
+        pInfo->stop_time_ms = 0;
+      } else {
+        is_playing = true;
+        // sample_audio_for_channel(i);
+        channel_register* pRegister = g_channel_registers + i;
+        if (t_us > pRegister->next_toggle_time_us) {
+          pRegister->next_toggle_time_us += pRegister->half_cycle_us;
+          if (pRegister->value != 0) {
+            pRegister->value = 0;
+          } else {
+            pRegister->value = pRegister->max_value;
+          }
+        }
+      }
+    }
+  }
+  return is_playing;
+}
+
+
+void Cartridge::render_my_audio() {
+  sigmaDeltaWrite(p1_channel,
+                  g_channel_registers[0].value + g_channel_registers[1].value + g_channel_registers[2].value);
+
+  sigmaDeltaWrite(p2_channel, g_channel_registers[1].value);
+
+  sigmaDeltaWrite(n_channel, g_channel_registers[2].value);
+  sigmaDeltaWrite(t_channel, g_channel_registers[3].value);
+}
+
+
+void Cartridge::start_tone(uint8_t channel, double freq, long duration_ms, uint8_t volume) {
+  channel_info* pInfo = &g_channels_info[channel];
+  pInfo->freq = freq;
+  pInfo->stop_time_ms = millis() + duration_ms;
+
+  channel_register * pRegister = &g_channel_registers[channel];
+  pRegister->half_cycle_us = 1000000 / freq;
+  pRegister->value = 0;
+  pRegister->max_value = volume;
+  pRegister->next_toggle_time_us = micros() + pRegister->half_cycle_us;
+
+  return;
+
+  // play until stop
 
   double half_cycle = 1000000 / freq;
+
 
   sigmaDeltaWrite(p1_channel, 0);
   auto start_ms = millis();
@@ -57,119 +123,177 @@ void Cartridge::tone(double freq, long duration_ms) {
   }
 }
 
+void Cartridge::play_until_end() {
+  while (sample_my_audio()) {
+    render_my_audio();
+  }
+}
+
 void Cartridge::play_nes(uint8_t* music) {
   // eggfly
   auto cpuFreq = ESP.getCpuFreqMHz();
   Serial.printf("CPU: %d MHz\n", cpuFreq);
 
-  long duration = 400;
-  tone(NOTE_C1, duration);
-  delay(duration);
-  tone(NOTE_D1, duration);
-  delay(duration);
-  tone(NOTE_E1, duration);
-  delay(duration);
-  tone(NOTE_F1, duration);
-  delay(duration);
-  tone(NOTE_G1, duration);
-  delay(duration);
-  tone(NOTE_A1, duration);
-  delay(duration);
-  tone(NOTE_B1, duration);
-  delay(duration);
+  auto volume = 12;
+  auto duration = 2000;
+  //  start_tone(0, NOTE_C2, duration, volume);
+  //  play_until_end();
 
-  tone(NOTE_C2, duration);
-  delay(duration);
-  tone(NOTE_D2, duration);
-  delay(duration);
-  tone(NOTE_E2, duration);
-  delay(duration);
-  tone(NOTE_F2, duration);
-  delay(duration);
-  tone(NOTE_G2, duration);
-  delay(duration);
-  tone(NOTE_A2, duration);
-  delay(duration);
-  tone(NOTE_B2, duration);
-  delay(duration);
+  Serial.println("哆");
+  start_tone(0, NOTE_C4, duration, volume);
+  play_until_end();
 
-  tone(NOTE_C3, duration);
-  delay(duration);
-  tone(NOTE_D3, duration);
-  delay(duration);
-  tone(NOTE_E3, duration);
-  delay(duration);
-  tone(NOTE_F3, duration);
-  delay(duration);
-  tone(NOTE_G3, duration);
-  delay(duration);
-  tone(NOTE_A3, duration);
-  delay(duration);
-  tone(NOTE_B3, duration);
-  delay(duration);
+  Serial.println("来");
+  start_tone(0, NOTE_D4, duration, volume);
+  play_until_end();
 
-  tone(NOTE_C4, duration);
-  delay(duration);
-  tone(NOTE_D4, duration);
-  delay(duration);
-  tone(NOTE_E4, duration);
-  delay(duration);
-  tone(NOTE_F4, duration);
-  delay(duration);
-  tone(NOTE_G4, duration);
-  delay(duration);
-  tone(NOTE_A4, duration);
-  delay(duration);
-  tone(NOTE_B4, duration);
-  delay(duration);
+  Serial.println("咪");
+  start_tone(0, NOTE_E4, duration, volume);
+  play_until_end();
 
-  tone(NOTE_C5, duration);
-  delay(duration);
-  tone(NOTE_D5, duration);
-  delay(duration);
-  tone(NOTE_E5, duration);
-  delay(duration);
-  tone(NOTE_F5, duration);
-  delay(duration);
-  tone(NOTE_G5, duration);
-  delay(duration);
-  tone(NOTE_A5, duration);
-  delay(duration);
-  tone(NOTE_B5, duration);
-  delay(duration);
+  Serial.println("发");
+  start_tone(0, NOTE_F4, duration, volume);
+  play_until_end();
 
-  tone(NOTE_C6, duration);
-  delay(duration);
-  tone(NOTE_D6, duration);
-  delay(duration);
-  tone(NOTE_E6, duration);
-  delay(duration);
-  tone(NOTE_F6, duration);
-  delay(duration);
-  tone(NOTE_G6, duration);
-  delay(duration);
-  tone(NOTE_A6, duration);
-  delay(duration);
-  tone(NOTE_B6, duration);
-  delay(duration);
+  Serial.println("搜");
+  start_tone(0, NOTE_G4, duration, volume);
+  play_until_end();
 
-  tone(NOTE_C7, duration);
-  delay(duration);
-  tone(NOTE_D7, duration);
-  delay(duration);
-  tone(NOTE_E7, duration);
-  delay(duration);
-  tone(NOTE_F7, duration);
-  delay(duration);
-  tone(NOTE_G7, duration);
-  delay(duration);
-  tone(NOTE_A7, duration);
-  delay(duration);
-  tone(NOTE_B7, duration);
-  delay(duration);
 
-  tone(NOTE_C8, duration);
-  delay(duration);
+  Serial.println("哆");
+  start_tone(0, NOTE_C4, duration / 2, volume);
+  play_until_end();
+
+  Serial.println("咪");
+  start_tone(0, NOTE_E4, duration / 2, volume);
+  play_until_end();
+
+  Serial.println("搜");
+  start_tone(0, NOTE_G4, duration / 2, volume);
+  play_until_end();
+
+  Serial.println("哆+咪+搜(和弦)");
+  start_tone(0, NOTE_C4, duration, volume);
+  start_tone(1, NOTE_E4, duration, volume);
+  start_tone(2, NOTE_G4, duration, volume);
+  play_until_end();
+
+  return;
+  start_tone(0, NOTE_A4, duration, volume);
+  play_until_end();
+  start_tone(0, NOTE_B4, duration, volume);
+  play_until_end();
+  start_tone(0, NOTE_C5, duration, volume);
+  play_until_end();
+
+  //  long duration = 400;
+  //  tone(NOTE_C1, duration);
+  //  delay(duration);
+  //  tone(NOTE_D1, duration);
+  //  delay(duration);
+  //  tone(NOTE_E1, duration);
+  //  delay(duration);
+  //  tone(NOTE_F1, duration);
+  //  delay(duration);
+  //  tone(NOTE_G1, duration);
+  //  delay(duration);
+  //  tone(NOTE_A1, duration);
+  //  delay(duration);
+  //  tone(NOTE_B1, duration);
+  //  delay(duration);
+  //
+  //  tone(NOTE_C2, duration);
+  //  delay(duration);
+  //  tone(NOTE_D2, duration);
+  //  delay(duration);
+  //  tone(NOTE_E2, duration);
+  //  delay(duration);
+  //  tone(NOTE_F2, duration);
+  //  delay(duration);
+  //  tone(NOTE_G2, duration);
+  //  delay(duration);
+  //  tone(NOTE_A2, duration);
+  //  delay(duration);
+  //  tone(NOTE_B2, duration);
+  //  delay(duration);
+  //
+  //  tone(NOTE_C3, duration);
+  //  delay(duration);
+  //  tone(NOTE_D3, duration);
+  //  delay(duration);
+  //  tone(NOTE_E3, duration);
+  //  delay(duration);
+  //  tone(NOTE_F3, duration);
+  //  delay(duration);
+  //  tone(NOTE_G3, duration);
+  //  delay(duration);
+  //  tone(NOTE_A3, duration);
+  //  delay(duration);
+  //  tone(NOTE_B3, duration);
+  //  delay(duration);
+  //
+  //  tone(NOTE_C4, duration);
+  //  delay(duration);
+  //  tone(NOTE_D4, duration);
+  //  delay(duration);
+  //  tone(NOTE_E4, duration);
+  //  delay(duration);
+  //  tone(NOTE_F4, duration);
+  //  delay(duration);
+  //  tone(NOTE_G4, duration);
+  //  delay(duration);
+  //  tone(NOTE_A4, duration);
+  //  delay(duration);
+  //  tone(NOTE_B4, duration);
+  //  delay(duration);
+  //
+  //  tone(NOTE_C5, duration);
+  //  delay(duration);
+  //  tone(NOTE_D5, duration);
+  //  delay(duration);
+  //  tone(NOTE_E5, duration);
+  //  delay(duration);
+  //  tone(NOTE_F5, duration);
+  //  delay(duration);
+  //  tone(NOTE_G5, duration);
+  //  delay(duration);
+  //  tone(NOTE_A5, duration);
+  //  delay(duration);
+  //  tone(NOTE_B5, duration);
+  //  delay(duration);
+  //
+  //  tone(NOTE_C6, duration);
+  //  delay(duration);
+  //  tone(NOTE_D6, duration);
+  //  delay(duration);
+  //  tone(NOTE_E6, duration);
+  //  delay(duration);
+  //  tone(NOTE_F6, duration);
+  //  delay(duration);
+  //  tone(NOTE_G6, duration);
+  //  delay(duration);
+  //  tone(NOTE_A6, duration);
+  //  delay(duration);
+  //  tone(NOTE_B6, duration);
+  //  delay(duration);
+  //
+  //  tone(NOTE_C7, duration);
+  //  delay(duration);
+  //  tone(NOTE_D7, duration);
+  //  delay(duration);
+  //  tone(NOTE_E7, duration);
+  //  delay(duration);
+  //  tone(NOTE_F7, duration);
+  //  delay(duration);
+  //  tone(NOTE_G7, duration);
+  //  delay(duration);
+  //  tone(NOTE_A7, duration);
+  //  delay(duration);
+  //  tone(NOTE_B7, duration);
+  //  delay(duration);
+  //
+  //  tone(NOTE_C8, duration);
+  //  delay(duration);
 
   return;
 
@@ -335,7 +459,9 @@ void Cartridge::reset_nes() {
   audio_counter = 0;
 }
 
+
 void Cartridge::sample_audio() {
+
   // Pulse 1
   if (p1_length_counter > 0) {
     if (p1_11_bit_timer >= 8) {

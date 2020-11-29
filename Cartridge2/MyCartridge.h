@@ -1,8 +1,3 @@
-/*
-  Cartridge.h - Library for parsing VGM into an NES APU emulation!
-  Created by Connor Nishijima, October 14th 2018.
-  Released under the GPLv3 license.
-*/
 
 #ifndef cartridge_h
 #define cartridge_h
@@ -116,7 +111,10 @@ class Cartridge
     uint32_t get_32_bit(uint8_t* music, uint32_t index);
     void reset_nes();
     void sample_audio();
+    bool sample_my_audio();
     void render_audio();
+    void render_my_audio();
+    void play_until_end();
     void clock_apu();
     void decrement_timers();
     void clock_lsfr();
@@ -135,7 +133,7 @@ class Cartridge
     uint8_t get_length_counter(uint8_t reg);
     uint8_t write_length_counter(uint8_t reg, uint8_t val);
     void clock_sweep_units();
-    void tone(double freq, long duration_ms);
+    void start_tone(uint8_t channel, double freq, long duration_ms, uint8_t volume);
 
     uint8_t NES_REG[24] = {
       // PULSE 1
