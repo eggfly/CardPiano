@@ -1,2 +1,2 @@
-# AdvancedTone32
-tone library for esp32
+# A card size piano 
+esp32 + mrp121
